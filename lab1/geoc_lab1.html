@@ -1,0 +1,213 @@
+<html>
+<head>
+<title>GEOC - Lab 1</title>
+</head>
+<h1>GEOC - Lab 1// Miquel Gotanegra</h1>
+
+<br>
+Last mouse position on canvas: <span id="mousepos"></span>
+<br>
+<canvas id="canvas" width="1200" height="800"></canvas>
+<br>
+
+
+<script type="text/javascript" src="TestLab1.json.js"></script>
+
+<!-- I use this library to get the isEqual function, to be able to compare two objects-->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.4/lodash.min.js"></script>
+
+
+<h2>Result of intersection classification</h2>
+<span id="result"></span>
+
+<script type="text/javascript">
+
+//========= Auxiliary objects and data =========//
+
+// Important: this is the input
+var segments = inputJSON.segments; // Requires inputJSON variable set in file
+//var segments = inputJSON.segments.slice(0,6); // You can use slice() to select a subset of the segments. Make sure it is an even number!
+
+var points = [];
+// See names colors at https://www.w3schools.com/colors/colors_names.asp
+// Add as many colors as needed to classify all intersection types
+var colors = ['Blue', 'Red', 'Green', 'Cyan', 'DarkOrange', 'Magenta', 'RosyBrown'];
+
+// default styles
+style = {
+  curve: {
+    width: 6,
+    color: "#333"
+  },
+  line: {
+    width: 1,
+    color: "#C00"
+  },
+  point: {
+    radius: 4,
+    width: 2,
+    color: "Black",
+    fill: "Black",
+    arc1: 0,
+    arc2: 2 * Math.PI
+  }
+}
+
+
+
+context1 = canvas.getContext("2d");
+drawCanvas();
+
+//========= Auxiliary functions =========//
+
+
+// Method to show mouse position relative to canvas as the mouse moves.
+canvas.addEventListener('mousemove', function(e) {
+	var rect = canvas.getBoundingClientRect();
+	var x = e.clientX - Math.round(rect.left);
+	var y = e.clientY - Math.round(rect.top);
+	document.getElementById("mousepos").innerHTML = "(" + x + ", " + y + ")";
+});
+
+function drawCanvas() {
+  // Clear everything
+  context1.clearRect(-canvas.width / 2, -canvas.height / 2, 2 * canvas.width, 2 * canvas.height);
+  // Draw whatever needs to be drawn
+  drawSegments(context1, style, segments); 
+
+}
+
+// Draws one point as circle
+function drawPoint(ctx, style, p) {
+    ctx.lineWidth = style.point.width;
+    ctx.strokeStyle = style.point.color;
+    ctx.fillStyle = style.point.fill;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, style.point.radius, style.point.arc1, style.point.arc2, true);
+    ctx.fill();
+    ctx.stroke();
+}
+
+// Draws one segment
+function drawSegment(ctx, style, segment, lineColor) {
+    p1 = segment.from;
+	p2 = segment.to;
+
+	// Line segment
+    ctx.lineWidth = style.line.width;
+	ctx.strokeStyle = lineColor;
+    ctx.beginPath();
+	ctx.moveTo(p1.x,p1.y);
+	ctx.lineTo(p2.x,p2.y);
+    ctx.stroke();
+			
+	// Draw vertices
+	drawPoint(ctx, style, segment.from);
+	drawPoint(ctx, style, segment.to);
+}
+
+// Draws all segments
+function drawSegments(ctx, style, segments) {
+	//For each pair draw pair after classifying intersection
+
+	for (var i = 0; i < segments.length; i=i+2) {
+		// Classify intersection and obtain color to draw pair of segments
+		var intersectionClass = classifyIntersection(segments[i], segments[i+1]);
+		reportResult(intersectionClass); // print description
+		var lineColor = colors[intersectionClass.type];
+		// Draw segment 
+		drawSegment(ctx, style, segments[i], lineColor);
+		drawSegment(ctx, style, segments[i+1], lineColor);
+	}
+}
+
+// Outputs the value of the intersection classification to the "results" HTML element
+function reportResult(intersectionClass) {
+	var text = "<font color='" + colors[intersectionClass.type] + "'>";
+	text = text + intersectionClass.type + ": " + intersectionClass.description;
+	text = text + "</font><br>";
+	document.getElementById("result").innerHTML = document.getElementById("result").innerHTML + text;
+}
+
+//========= Your code probably should be somewhere here =========//
+function determinant2x2(p,q,r){
+	//we only care about the sign, not the number
+	var det = ((q.x - p.x) * (r.y-p.y)) - ((r.x-p.x) * (q.y-p.y));
+	if (det == 0) return 0;
+	else if (det > 0) return 1;
+	else return -1;
+}
+function share_a_point(s1,s2){
+	return (_.isEqual(s1.from,s2.from) | _.isEqual(s1.from,s2.to) | _.isEqual(s1.to,s2.from) | _.isEqual(s1.to,s2.to));
+}
+// TODO: Add your code here to classify all possible segment intersection types
+function classifyIntersection(s1, s2) {
+
+	var  s11= determinant2x2(s1.from,s1.to,s2.from);
+	var  s12= determinant2x2(s1.from,s1.to,s2.to);
+
+	var  s21= determinant2x2(s2.from,s2.to,s1.from);
+	var  s22= determinant2x2(s2.from,s2.to,s1.to);
+
+	var intersectionType, intersectionTypeDescription;
+	//var colors = ['Blue', 'Red', 'Green', 'Cyan', 'DarkOrange', 'Magenta', 'RosyBrown'];
+	
+	if(share_a_point(s1,s2)){
+//if they share a point they already intersect so either each extreme is on a diferent side or both determinants are 0
+		if(s11 == s22){
+			intersectionType = 5;
+			intersectionTypeDescription = "s1 intersects s2 (are co-linear and share one extreme)";
+		}
+		else{
+			intersectionType = 4;
+			intersectionTypeDescription = "s1 intersects s2 (they share an extrem)";
+		}
+	}
+
+
+	
+	else if(s11==s21 && s11==0){
+// they are co-linear, now lets check if they colide
+		var intersect = false;
+		if(s1.from.y == s2.from.y){
+			intersect = (Math.min(s1.from.x,s1.to.x) < Math.max(s2.from.x,s2.to.x) & Math.min(s2.from.x,s2.to.x) < Math.max(s1.from.x,s1.to.x) )
+		}
+		else{
+			intersect = (Math.min(s1.from.y,s1.to.y) < Math.max(s2.from.y,s2.to.y) & Math.min(s2.from.y,s2.to.y) < Math.max(s1.from.y,s1.to.y) )
+		}
+		if(intersect){
+			intersectionType = 0;
+			intersectionTypeDescription = "s1 intersects s2 (are co-linear)";
+		}
+		else{
+			intersectionType = 1;
+			intersectionTypeDescription = "s1 doesnt intesect s2";
+		}
+		
+	}
+
+
+	else if ( (s11 != s12) && (s21 != s22) )  {
+//both lines have their extrems at diferents sides of of the oposed line
+		if(s11*s12*s21*s22 == 0){
+			//if one of the determinants is 0 and is not co-lineal
+			intersectionType = 6;
+			intersectionTypeDescription = "s1 intersects s2 (one extreme belongs to the other segment but not co-lineal)";
+		}
+		else{
+			intersectionType = 2;
+			intersectionTypeDescription = "s1 intersects s2 (they share one point)";
+		}
+	}
+	else {
+		intersectionType = 1;
+		intersectionTypeDescription = "s1 doesnt intesect s2";
+		}
+		
+	// Return object with two fields: a numbered type, and a description
+	return {"type": intersectionType, "description": intersectionTypeDescription} ;
+}
+
+
+</script>
+</html>
